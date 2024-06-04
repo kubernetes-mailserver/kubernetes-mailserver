@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: mailserver
+  labels:
+    app: mailserver
+
+spec:
+  # `Local` is most likely required, otherwise every incoming request would be identified by the external IP,
+  # which will get banned by Fail2Ban when monitored services are not configured for PROXY protocol
+  externalTrafficPolicy: Local
+  type: LoadBalancer
+
+  selector:
+    app: mailserver
+
+  ports:
+    # smtp
+    - name: smtp
+      port: 25
+      targetPort: smtp
+      protocol: TCP
+    # submissions (ESMTP with implicit TLS)
+    - name: submissions
+      port: 465
+      targetPort: submissions
+      protocol: TCP
+    # submission (ESMTP with explicit TLS)
+    - name: submission
+      port: 587
+      targetPort: submission
+      protocol: TCP
+    # imaps (implicit TLS)
+    - name: imaps
+      port: 993
+      targetPort: imaps
+      protocol: TCP
