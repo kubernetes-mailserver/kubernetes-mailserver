@@ -1,0 +1,18 @@
+namespace: kubernetes-mailserver
+
+resources:
+  - namespace.yaml
+  - issuer.yaml
+  - certificate.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - claim.yaml
+
+configMapGenerator:
+  - name: mailserver-files
+    options:
+      disableNameSuffixHash: true
+    files:
+      - postfix-accounts.cf
+

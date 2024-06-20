@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: mailserver
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailserver
+
+  template:
+    metadata:
+      labels:
+        app: mailserver
+
+    spec:
+      hostname: mail
+      containers:
+        - name: mailserver
+          image: ghcr.io/docker-mailserver/docker-mailserver:13.3.1
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            # `allowPrivilegeEscalation: true` is required to support SGID via the `postdrop`
+            # executable in `/var/mail-state` for Postfix (maildrop + public dirs):
+            # https://github.com/docker-mailserver/docker-mailserver/pull/3625
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            runAsUser: 0
+            runAsGroup: 0
+            runAsNonRoot: false
+            privileged: false
+            capabilities:
+              add:
+                # file permission capabilities
+                - CHOWN
+                - FOWNER
+                - MKNOD
+                - SETGID
+                - SETUID
+                - DAC_OVERRIDE
+                # network capabilities
+                - NET_ADMIN  # needed for F2B
+                - NET_RAW    # needed for F2B
+                - NET_BIND_SERVICE
+                # miscellaneous  capabilities
+                - SYS_CHROOT
+                - KILL
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+
+          # Tune this to your needs.
+          # If you disable ClamAV, you can use less RAM and CPU.
+          # This becomes important in case you're low on resources
+          # and Kubernetes refuses to schedule new pods.
+          resources:
+            limits:
+              memory: 4Gi
+              cpu: 1500m
+            requests:
+              memory: 2Gi
+              cpu: 600m
+
+          volumeMounts:
+            - name: files
+              subPath: postfix-accounts.cf
+              mountPath: /tmp/docker-mailserver/postfix-accounts.cf
+              readOnly: true
+
+            # PVCs
+            - name: data
+              mountPath: /var/mail
+              subPath: data
+              readOnly: false
+            - name: data
+              mountPath: /var/mail-state
+              subPath: state
+              readOnly: false
+            - name: data
+              mountPath: /var/log/mail
+              subPath: log
+              readOnly: false
+
+            # certificates
+            - name: certificates-rsa
+              mountPath: /secrets/ssl/rsa/
+              readOnly: true
+
+          ports:
+            - name: smtp
+              containerPort: 25
+              protocol: TCP
+            - name: submissions
+              containerPort: 465
+              protocol: TCP
+            - name: submission
+              containerPort: 587
+            - name: imaps
+              containerPort: 993
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: mailserver-env
+
+      restartPolicy: Always
+
+      volumes:
+        # configuration files
+        - name: files
+          configMap:
+            name: mailserver-files
+
+        # PVCs
+        - name: data
+          persistentVolumeClaim:
+            claimName: mailserver-data
+
+        # certificates
+        - name: certificates-rsa
+          secret:
+            secretName: mail-tls-certificate-rsa
+            items:
+              - key: tls.key
+                path: tls.key
+              - key: tls.crt
+                path: tls.crt

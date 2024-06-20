@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: mailserver-env
+
+immutable: false
+
+data:
+  TLS_LEVEL: modern
+  POSTSCREEN_ACTION: drop
+  OVERRIDE_HOSTNAME: host.minikube.internal
+  FAIL2BAN_BLOCKTYPE: drop
+  POSTMASTER_ADDRESS: pmig@glasskube.com
+  UPDATE_CHECK_INTERVAL: 10d
+  POSTFIX_INET_PROTOCOLS: ipv4
+  ENABLE_CLAMAV: '1'
+  ENABLE_POSTGREY: '0'
+  ENABLE_FAIL2BAN: '1'
+  AMAVIS_LOGLEVEL: '-1'
+  SPOOF_PROTECTION: '1'
+  MOVE_SPAM_TO_JUNK: '1'
+  ENABLE_UPDATE_CHECK: '1'
+  ENABLE_SPAMASSASSIN: '1'
+  SUPERVISOR_LOGLEVEL: warn
+  SPAMASSASSIN_SPAM_TO_INBOX: '1'
+
+  # here, we provide an example for the SSL configuration
+  SSL_TYPE: manual
+  SSL_CERT_PATH: /secrets/ssl/rsa/tls.crt
+  SSL_KEY_PATH: /secrets/ssl/rsa/tls.key

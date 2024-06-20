@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+
+metadata:
+  name: mail-tls-certificate-rsa
+
+spec:
+  secretName: mail-tls-certificate-rsa
+  isCA: false
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 2048
+  dnsNames: [host.minikube.internal]
+  issuerRef:
+    name: mail-issuer
+    kind: Issuer
