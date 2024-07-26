@@ -11,7 +11,7 @@ data:
   POSTSCREEN_ACTION: drop
   OVERRIDE_HOSTNAME: host.minikube.internal
   FAIL2BAN_BLOCKTYPE: drop
-  POSTMASTER_ADDRESS: pmig@glasskube.com
+  POSTMASTER_ADDRESS: pmig@host.minikube.internal
   UPDATE_CHECK_INTERVAL: 10d
   POSTFIX_INET_PROTOCOLS: ipv4
   ENABLE_CLAMAV: '1'

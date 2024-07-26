@@ -1,0 +1,64 @@
+# Source: docker-mailserver/templates/service.yaml
+kind: "Service"
+apiVersion: "v1"
+metadata:
+  annotations:
+    ## These annontations mark the service as monitorable by Prometheus, both directly as a service level metric and
+    ## via the blackbox exporter. For more information, see
+    ## values.yaml
+    prometheus.io/scrape: "true"
+    prometheus.io/probe: "false"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9102"
+    ##
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: "Helm"
+    release: "docker-mailserver"
+  name: docker-mailserver
+spec:
+  ## If a load balancer is being used, ensure that the newer type of LB that passes along IP information is used
+  ## rather than the legacy one.
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: docker-mailserver
+    release: "docker-mailserver"
+  ports:
+    - name: smtp
+      port: 25
+      targetPort: smtp
+
+    - name: submissions
+      targetPort: submissions
+      port: 465
+    - name: submission
+      targetPort: submission
+      port: 587
+    - name: smtp-proxy
+      targetPort: smtp-proxy
+      port: 12525
+    - name: subs-proxy
+      targetPort: subs-proxy
+      port: 10465
+    - name: sub-proxy
+      targetPort: sub-proxy
+      port: 10587
+    - name: imap
+      targetPort: imap
+      port: 143
+    - name: imaps
+      targetPort: imaps
+      port: 993
+    - name: imap-proxy
+      targetPort: imap-proxy
+      port: 10143
+    - name: imaps-proxy
+      targetPort: imaps-proxy
+      port: 10993
+    - name: rspamd
+      targetPort: rspamd
+      port: 11334
+
+  type: LoadBalancer
+---

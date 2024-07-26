@@ -1,0 +1,11 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kubernetes-mailserver
+spec:
+  secretName: pmig-cert
+  dnsNames:
+    - mail.example.com
+  issuerRef:
+    name: mail-issuer
+    kind: Issuer
