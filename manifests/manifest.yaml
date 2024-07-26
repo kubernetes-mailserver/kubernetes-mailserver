@@ -1,0 +1,626 @@
+---
+# Source: docker-mailserver/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: Helm
+    release: docker-mailserver
+  name: docker-mailserver
+---
+# Source: docker-mailserver/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: "Helm"
+    release: "docker-mailserver"
+  name: dovecot-cf
+data:
+  dovecot.cf: |
+      
+        haproxy_trusted_networks = 10.0.0.0/8 192.168.0.0/16 172.16.0.0/16
+        service imap-login {
+            inet_listener imap {
+                port = 143
+            }
+          
+            inet_listener imaps {
+                port = 993
+                ssl = yes
+            }
+          
+            inet_listener imap_proxy {
+                haproxy = yes
+                port = 10143
+                ssl = no
+            }
+      
+            inet_listener imaps_proxy {
+                haproxy = yes
+                port = 10993
+                ssl = yes
+            }
+        }
+---
+# Source: docker-mailserver/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: "Helm"
+    release: "docker-mailserver"
+  name: fts-xapian-plugin-conf
+data:
+  fts-xapian-plugin.conf: |
+---
+# Source: docker-mailserver/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: "Helm"
+    release: "docker-mailserver"
+  name: user-patches-sh
+data:
+  user-patches.sh: |
+      #!/bin/bash
+      # Make sure to keep this file in sync with https://github.com/docker-mailserver/docker-mailserver/blob/master/target/postfix/master.cf!
+      cat <<EOS >> /etc/postfix/master.cf
+      
+      # Submission with proxy
+      10587     inet  n       -       n       -       -       smtpd
+        -o syslog_name=postfix/submission
+        -o smtpd_tls_security_level=encrypt
+        -o smtpd_sasl_auth_enable=yes
+        -o smtpd_sasl_type=dovecot
+        -o smtpd_reject_unlisted_recipient=no
+        -o smtpd_sasl_authenticated_header=yes
+        -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+        -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+        -o smtpd_sender_restrictions=\$mua_sender_restrictions
+        -o smtpd_discard_ehlo_keywords=
+        -o milter_macro_daemon_name=ORIGINATING
+        -o cleanup_service_name=sender-cleanup
+        -o smtpd_upstream_proxy_protocol=haproxy  
+      
+      # Submissions with proxy
+      10465     inet  n       -       n       -       -       smtpd
+        -o syslog_name=postfix/submissions
+        -o smtpd_tls_wrappermode=yes
+        -o smtpd_sasl_auth_enable=yes
+        -o smtpd_sasl_type=dovecot
+        -o smtpd_reject_unlisted_recipient=no
+        -o smtpd_sasl_authenticated_header=yes
+        -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+        -o smtpd_relay_restrictions=permit_sasl_authenticated,reject
+        -o smtpd_sender_restrictions=\$mua_sender_restrictions
+        -o smtpd_discard_ehlo_keywords=
+        -o milter_macro_daemon_name=ORIGINATING
+        -o cleanup_service_name=sender-cleanup
+        -o smtpd_upstream_proxy_protocol=haproxy
+      
+      # Smtp with proxy
+      12525     inet  n       -       n       -       1       postscreen
+        -o syslog_name=postfix/smtp-proxy
+        -o postscreen_upstream_proxy_protocol=haproxy
+        -o postscreen_cache_map=btree:$data_directory/postscreen_10025_cache
+      EOS
+---
+# Source: docker-mailserver/templates/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: docker-mailserver-mail-config
+spec:
+  accessModes:
+    - ReadWriteOnce    
+  resources:
+    requests:
+      storage: "1Mi"
+---
+# Source: docker-mailserver/templates/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: docker-mailserver-mail-data
+spec:
+  accessModes:
+    - ReadWriteOnce    
+  resources:
+    requests:
+      storage: "10Gi"
+---
+# Source: docker-mailserver/templates/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: docker-mailserver-mail-log
+spec:
+  accessModes:
+    - ReadWriteOnce    
+  resources:
+    requests:
+      storage: "1Gi"
+---
+# Source: docker-mailserver/templates/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: docker-mailserver-mail-state
+spec:
+  accessModes:
+    - ReadWriteOnce    
+  resources:
+    requests:
+      storage: "1Gi"
+---
+# Source: docker-mailserver/templates/service.yaml
+kind: "Service"
+apiVersion: "v1"
+metadata:
+  annotations:
+    ## These annontations mark the service as monitorable by Prometheus, both directly as a service level metric and
+    ## via the blackbox exporter. For more information, see
+    ## values.yaml
+    prometheus.io/scrape: "true"
+    prometheus.io/probe: "false"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "9102"
+    ##
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: "Helm"
+    release: "docker-mailserver"
+  name: docker-mailserver
+spec:
+  ## If a load balancer is being used, ensure that the newer type of LB that passes along IP information is used
+  ## rather than the legacy one.
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: docker-mailserver
+    release: "docker-mailserver"
+  ports:
+    - name: smtp
+      port: 25
+      targetPort: smtp
+
+    - name: submissions
+      targetPort: submissions
+      port: 465    
+    - name: submission
+      targetPort: submission
+      port: 587
+    - name: smtp-proxy
+      targetPort: smtp-proxy
+      port: 12525
+    - name: subs-proxy
+      targetPort: subs-proxy
+      port: 10465
+    - name: sub-proxy
+      targetPort: sub-proxy
+      port: 10587
+    - name: imap
+      targetPort: imap
+      port: 143       
+    - name: imaps
+      targetPort: imaps
+      port: 993
+    - name: imap-proxy
+      targetPort: imap-proxy
+      port: 10143
+    - name: imaps-proxy
+      targetPort: imaps-proxy
+      port: 10993
+    - name: rspamd
+      targetPort: rspamd
+      port: 11334
+
+  type: LoadBalancer
+---
+# Source: docker-mailserver/templates/deployment.yaml
+apiVersion: "apps/v1"
+kind: "Deployment"
+metadata:
+  labels:
+    app.kubernetes.io/name: docker-mailserver
+    chart: "docker-mailserver-4.0.5"
+    heritage: "Helm"
+    release: "docker-mailserver"
+  name: docker-mailserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: docker-mailserver
+      release: "docker-mailserver"
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: docker-mailserver
+        release: "docker-mailserver"
+    spec:
+      nodeSelector:
+        {}
+      runtimeClassName: 
+      priorityClassName: 
+      restartPolicy: "Always"
+      serviceAccountName: docker-mailserver
+      securityContext:
+        null
+      volumes:
+          # ConfigMaps
+        - name: dovecot-cf
+          configMap:
+            name: dovecot-cf
+        - name: fts-xapian-plugin-conf
+          configMap:
+            name: fts-xapian-plugin-conf
+        - name: user-patches-sh
+          configMap:
+            name: user-patches-sh
+
+        # Secrets
+
+        # Certificate
+        - name: certificate
+          secret:
+            secretName: pmig-cert
+
+        # PVCs
+        - name: mail-config
+          persistentVolumeClaim:
+            claimName: docker-mailserver-mail-config
+            
+        - name: mail-data
+          persistentVolumeClaim:
+            claimName: docker-mailserver-mail-data
+            
+        - name: mail-log
+          persistentVolumeClaim:
+            claimName: docker-mailserver-mail-log
+            
+        - name: mail-state
+          persistentVolumeClaim:
+            claimName: docker-mailserver-mail-state
+            
+
+        # Extra volumes
+
+      containers:
+        - name: docker-mailserver
+          image: mailserver/docker-mailserver:14.0.0
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: ACCOUNT_PROVISIONER
+            value: 
+          - name: AMAVIS_LOGLEVEL
+            value: "0"
+          - name: CLAMAV_MESSAGE_SIZE_LIMIT
+            value: 
+          - name: DEFAULT_RELAY_HOST
+            value: 
+          - name: DMS_VMAIL_GID
+            value: 
+          - name: DMS_VMAIL_UID
+            value: 
+          - name: DOVECOT_AUTH_BIND
+            value: 
+          - name: DOVECOT_INET_PROTOCOLS
+            value: "all"
+          - name: DOVECOT_MAILBOX_FORMAT
+            value: "maildir"
+          - name: DOVECOT_PASS_FILTER
+            value: 
+          - name: DOVECOT_TLS
+            value: 
+          - name: DOVECOT_USER_FILTER
+            value: 
+          - name: ENABLE_AMAVIS
+            value: "0"
+          - name: ENABLE_CLAMAV
+            value: "0"
+          - name: ENABLE_DNSBL
+            value: "0"
+          - name: ENABLE_FAIL2BAN
+            value: "0"
+          - name: ENABLE_FETCHMAIL
+            value: "0"
+          - name: ENABLE_GETMAIL
+            value: "0"
+          - name: ENABLE_IMAP
+            value: "1"
+          - name: ENABLE_MANAGESIEVE
+            value: 
+          - name: ENABLE_OPENDKIM
+            value: "0"
+          - name: ENABLE_OPENDMARC
+            value: "0"
+          - name: ENABLE_POLICYD_SPF
+            value: "0"
+          - name: ENABLE_POP3
+            value: 
+          - name: ENABLE_POSTGREY
+            value: "0"
+          - name: ENABLE_QUOTAS
+            value: "1"
+          - name: ENABLE_RSPAMD
+            value: "1"
+          - name: ENABLE_RSPAMD_REDIS
+            value: "1"
+          - name: ENABLE_SASLAUTHD
+            value: "0"
+          - name: ENABLE_SPAMASSASSIN
+            value: "0"
+          - name: ENABLE_SPAMASSASSIN_KAM
+            value: "0"
+          - name: ENABLE_SRS
+            value: "0"
+          - name: ENABLE_UPDATE_CHECK
+            value: "1"
+          - name: FAIL2BAN_BLOCKTYPE
+            value: "drop"
+          - name: FETCHMAIL_PARALLEL
+            value: "0"
+          - name: FETCHMAIL_POLL
+            value: "300"
+          - name: GETMAIL_POLL
+            value: "5"
+          - name: LDAP_BIND_DN
+            value: 
+          - name: LDAP_BIND_PW
+            value: 
+          - name: LDAP_QUERY_FILTER_ALIAS
+            value: 
+          - name: LDAP_QUERY_FILTER_DOMAIN
+            value: 
+          - name: LDAP_QUERY_FILTER_GROUP
+            value: 
+          - name: LDAP_QUERY_FILTER_USER
+            value: 
+          - name: LDAP_SEARCH_BASE
+            value: 
+          - name: LDAP_SERVER_HOST
+            value: 
+          - name: LDAP_START_TLS
+            value: 
+          - name: LOGROTATE_COUNT
+            value: "4"
+          - name: LOGROTATE_INTERVAL
+            value: "weekly"
+          - name: LOGWATCH_INTERVAL
+            value: 
+          - name: LOGWATCH_RECIPIENT
+            value: 
+          - name: LOGWATCH_SENDER
+            value: 
+          - name: LOG_LEVEL
+            value: "info"
+          - name: MARK_SPAM_AS_READ
+            value: "0"
+          - name: MOVE_SPAM_TO_JUNK
+            value: "1"
+          - name: NETWORK_INTERFACE
+            value: 
+          - name: OVERRIDE_HOSTNAME
+            value: "mail.example.com"
+          - name: PERMIT_DOCKER
+            value: "none"
+          - name: PFLOGSUMM_RECIPIENT
+            value: 
+          - name: PFLOGSUMM_SENDER
+            value: 
+          - name: PFLOGSUMM_TRIGGER
+            value: 
+          - name: POSTFIX_DAGENT
+            value: 
+          - name: POSTFIX_INET_PROTOCOLS
+            value: "all"
+          - name: POSTFIX_MAILBOX_SIZE_LIMIT
+            value: 
+          - name: POSTFIX_MESSAGE_SIZE_LIMIT
+            value: 
+          - name: POSTFIX_REJECT_UNKNOWN_CLIENT_HOSTNAME
+            value: "0"
+          - name: POSTGREY_AUTO_WHITELIST_CLIENTS
+            value: "5"
+          - name: POSTGREY_DELAY
+            value: "300"
+          - name: POSTGREY_MAX_AGE
+            value: "35"
+          - name: POSTGREY_TEXT
+            value: "Delayed by Postgrey"
+          - name: POSTMASTER_ADDRESS
+            value: 
+          - name: POSTSCREEN_ACTION
+            value: "enforce"
+          - name: RELAY_HOST
+            value: 
+          - name: RELAY_PASSWORD
+            value: 
+          - name: RELAY_PORT
+            value: "25"
+          - name: RELAY_USER
+            value: 
+          - name: REPORT_RECIPIENT
+            value: 
+          - name: REPORT_SENDER
+            value: 
+          - name: RSPAMD_CHECK_AUTHENTICATED
+            value: "0"
+          - name: RSPAMD_GREYLISTING
+            value: "0"
+          - name: RSPAMD_HFILTER
+            value: "1"
+          - name: RSPAMD_HFILTER_HOSTNAME_UNKNOWN_SCORE
+            value: "6"
+          - name: RSPAMD_LEARN
+            value: "0"
+          - name: RSPAMD_NEURAL
+            value: "0"
+          - name: SASLAUTHD_LDAP_AUTH_METHOD
+            value: 
+          - name: SASLAUTHD_LDAP_BIND_DN
+            value: 
+          - name: SASLAUTHD_LDAP_FILTER
+            value: 
+          - name: SASLAUTHD_LDAP_MECH
+            value: 
+          - name: SASLAUTHD_LDAP_PASSWORD
+            value: 
+          - name: SASLAUTHD_LDAP_PASSWORD_ATTR
+            value: 
+          - name: SASLAUTHD_LDAP_SEARCH_BASE
+            value: 
+          - name: SASLAUTHD_LDAP_SERVER
+            value: 
+          - name: SASLAUTHD_LDAP_START_TLS
+            value: 
+          - name: SASLAUTHD_LDAP_TLS_CACERT_DIR
+            value: 
+          - name: SASLAUTHD_LDAP_TLS_CACERT_FILE
+            value: 
+          - name: SASLAUTHD_LDAP_TLS_CHECK_PEER
+            value: 
+          - name: SASLAUTHD_MECHANISMS
+            value: 
+          - name: SASLAUTHD_MECH_OPTIONS
+            value: 
+          - name: SA_KILL
+            value: "10"
+          - name: SA_TAG
+            value: "2"
+          - name: SA_TAG2
+            value: "6.31"
+          - name: SMTP_ONLY
+            value: 
+          - name: SPAMASSASSIN_SPAM_TO_INBOX
+            value: "1"
+          - name: SPAM_SUBJECT
+            value: "***SPAM*** "
+          - name: SPOOF_PROTECTION
+            value: 
+          - name: SRS_EXCLUDE_DOMAINS
+            value: 
+          - name: SRS_SECRET
+            value: 
+          - name: SRS_SENDER_CLASSES
+            value: "envelope_sender"
+          - name: SSL_ALT_CERT_PATH
+            value: 
+          - name: SSL_ALT_KEY_PATH
+            value: 
+          - name: SUPERVISOR_LOGLEVEL
+            value: 
+          - name: TLS_LEVEL
+            value: 
+          - name: TZ
+            value: 
+          - name: UPDATE_CHECK_INTERVAL
+            value: "1d"
+          - name: VIRUSMAILS_DELETE_DELAY
+            value: 
+          - name: SSL_TYPE
+            value: manual
+          - name: SSL_CERT_PATH
+            value: /tmp/dms/custom-certs/tls.crt
+          - name: SSL_KEY_PATH
+            value: /tmp/dms/custom-certs/tls.key
+
+          resources:
+            limits:
+              cpu: "2"
+              ephemeral-storage: 500Mi
+              memory: 2048Mi
+            requests:
+              cpu: "1"
+              ephemeral-storage: 100Mi
+              memory: 1536Mi
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: false
+
+          volumeMounts:
+            # Certificate
+            - name: certificate
+              mountPath: /tmp/dms/custom-certs
+              readOnly: true
+
+            # Config via ConfigMaps
+            - name: dovecot-cf
+              subPath: dovecot.cf
+              mountPath: /tmp/docker-mailserver/dovecot.cf
+            - name: fts-xapian-plugin-conf
+              subPath: fts-xapian-plugin.conf
+              mountPath: /etc/dovecot/conf.d/10-plugin.conf
+            - name: user-patches-sh
+              subPath: user-patches.sh
+              mountPath: /tmp/docker-mailserver/user-patches.sh
+
+            # Config via Secrets
+
+            # Mount Volumes
+            - name: mail-config
+              mountPath: /tmp/docker-mailserver
+            - name: mail-data
+              mountPath: /var/mail
+            - name: mail-log
+              mountPath: /var/log/mail
+            - name: mail-state
+              mountPath: /var/mail-state
+
+            # Mount Extra Volumes
+
+          livenessProbe:
+            exec:
+               command:
+                 - /bin/bash
+                 - -c
+                 - supervisorctl status | grep -E "amavis|clamav|cron|dovecot|mailserver|opendkim|opendmarc|postfix|rsyslog" | grep RUNNING
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+               command:
+                 - /bin/bash
+                 - -c
+                 - supervisorctl status | grep -E "mailserver|postfix" | grep RUNNING
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          ports:
+            - name: smtp
+              containerPort: 25
+
+            - name: submissions
+              containerPort: 465
+            - name: submission
+              containerPort: 587
+            - name: smtp-proxy
+              containerPort: 12525
+            - name: subs-proxy
+              containerPort: 10465
+            - name: sub-proxy
+              containerPort: 10587
+            - name: imap
+              containerPort: 143
+            - name: imaps
+              containerPort: 993
+            - name: imap-proxy
+              containerPort: 10143
+            - name: imaps-proxy
+              containerPort: 10993
+            - name: rspamd
+              containerPort: 11334

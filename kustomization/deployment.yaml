@@ -19,7 +19,7 @@ spec:
       hostname: mail
       containers:
         - name: mailserver
-          image: ghcr.io/docker-mailserver/docker-mailserver:13.3.1
+          image: ghcr.io/docker-mailserver/docker-mailserver:14.0.0
           imagePullPolicy: IfNotPresent
 
           securityContext:
@@ -31,7 +31,7 @@ spec:
             runAsUser: 0
             runAsGroup: 0
             runAsNonRoot: false
-            privileged: false
+            privileged: true
             capabilities:
               add:
                 # file permission capabilities
