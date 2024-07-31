@@ -22,6 +22,43 @@ Using **traditional package managers** or applying manifests directly can be **s
 Therefore, a Glasskube package will help you to **install a mailserver** using the **Glasskube UI** for reduced complexity and increased transparency.
 The **package is dependency aware** and will get automatic updates.
 
+## ✨ Features
+|                                                                                                   |                                                                                                                                       |
+|---------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| **Easy installation** <br> Easily install Kubernetes Mailserver via the Glasskube Package Manager | ![Overview](https://raw.githubusercontent.com/kubernetes-mailserver/.github/main/images/glasskube-kubernetes-mailserver-overview.png) |
+| **UI Package configurations** <br> Configure Kubernetes Mailserver via a GUI.                     | ![GUI](https://raw.githubusercontent.com/kubernetes-mailserver/.github/main/images/glasskube-kubernetes-mailserver-detail.png)        |
+| **CLI Package configurations** <br> Configure Kubernetes Mailserver via a CLI.                    | ![CLI](https://raw.githubusercontent.com/kubernetes-mailserver/.github/main/images/glasskube-kubernetes-mailserver-cli.png)           |
+
+
+
+## 🚀 Quick Start
+
+### 1. Install [Glasskube](https://glasskube.dev/)
+
+You can install Glasskube via [Homebrew](https://brew.sh/):
+
+```bash
+brew install glasskube/tap/glasskube
+```
+
+### 2. Add the Kubernetes Mailserver Repo
+
+```bash
+glasskube repo add kubernetes-mailserver https://kubernetes-mailserver.github.io/glasskube-repo/packages
+```
+
+### 3. Install Kubernetes Mailserver
+
+In order to use Kubernetes Mailserver you need to use a Domain and generate a [TLS Secret](https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets)
+for it which you need to reference in the installation process.
+
+You can install the Kubernetes Mailserver package either via the graphical user interface or the cli.
+
+| GUI               | CLI                                       |
+|-------------------|-------------------------------------------|
+| `glasskube serve` | `glasskube install kubernetes-mailserver` |
+
+
 ## ☝️ Need Help or Want to Provide Feedback?
 
 If you encounter any problems, we will be happy to support you wherever we can on our [Discord](https://discord.gg/SxH6KUCGH7).
